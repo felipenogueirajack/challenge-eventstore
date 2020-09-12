@@ -14,6 +14,13 @@ public class Event {
     public Event(String type, long timestamp) {
         this.type = type;
         this.timestamp = timestamp;
+        this.isCompressed= false;
+    }
+    
+    public Event(String type, long timestamp, boolean isCompressed) {
+        this.type = type;
+        this.timestamp = timestamp;
+        this.isCompressed= isCompressed;
     }
 
     public String type() {

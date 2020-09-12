@@ -16,7 +16,7 @@ import java.util.concurrent.Executors;
 import org.junit.Test;
 
 
-public class ConcurrentEventStoreTest extends EventStoreBaseTest{
+public class ConcurrentEventStoreTest{
 
 	@Test
 	public void insertTest() {
