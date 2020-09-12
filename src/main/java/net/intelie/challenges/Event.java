@@ -6,6 +6,10 @@ package net.intelie.challenges;
 public class Event {
     private final String type;
     private final long timestamp;
+	
+	/** indicates if the event is historical, its timestamp is compressed **/
+    private final boolean isCompressed;
+
 
     public Event(String type, long timestamp) {
         this.type = type;
@@ -19,4 +23,9 @@ public class Event {
     public long timestamp() {
         return timestamp;
     }
+	
+	public boolean isCompressed() {
+    	return isCompressed;
+    }
+
 }
