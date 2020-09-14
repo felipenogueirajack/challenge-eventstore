@@ -32,14 +32,14 @@ import java.util.concurrent.ConcurrentSkipListMap;
  * ConcurrentModificationException}. 
  * 
  * <p> Another feature of this implementation is that historical events might be
- *  kept a part in a different map. The method {@code encodeAndMoveToHistory} 
+ *  kept in a different map. The method {@code encodeAndMoveToHistory} 
  *  can be called by a job in order to move the events of the given type from 
  *  the main map to the historical one. In addition, also for space concerns, 
  *  the timestamps of the historical series are compressed. For simplicity, it 
  *  was assumed that
  * "historical" data does not receives events to be inserted. 
  * The objective was to show that historical events can be stored 
- * a part and have compressed timestamps for better performance of the operations
+ * apart and have compressed timestamps for better performance of the operations
  * in the main map and to save memory. As they do not tend do be 
  * searched (queried) so often, the gain in space due to compression outweighs
  * the overhead in processing of compressing and decompressing when they are 
@@ -166,18 +166,17 @@ public class ConcurrentEventStore implements EventStore {
 	}
 
 	/**
-	 * Returns an iterator for the events of a given type and whose timestamps
+	 * <p> Returns an iterator for the events of a given type and whose timestamps
 	 * range from {@code startTime}, inclusive, to {@code endTime}, 
 	 * exclusive.
-	 * It runs in O(log n), as we can access the skipList of the given time in a
+	 * <p> It runs in O(log n), as we can access the skipList of the given time in a
 	 * constant time and the search for startTime and endTime runs in about 
 	 * in O(log n) each.
 	 * 
-	 * It looks for the events in the main map and also in the history map. 
+	 * <p>It looks for the events in the main map and also in the history map. 
 	 * As the history do not tend do be queried so often, its timestamps have
 	 * been delta-encoded to save memory space. As such, they are decoded 
-	 * during the iteration, only when needed. 
-	 *  
+	 * during the iteration, only when needed.   	   
 	 * 
 	 * 
 	 * @param type      The type we are querying for.
