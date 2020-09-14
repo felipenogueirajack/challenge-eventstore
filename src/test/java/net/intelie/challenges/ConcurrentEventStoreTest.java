@@ -6,12 +6,16 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
 
@@ -65,23 +69,9 @@ public class ConcurrentEventStoreTest{
 		}
 	}
 	
-	
 	@Test
-    public void testConcurrentInsert(){
-    	ConcurrentEventStore store = new ConcurrentEventStore();
-    	ExecutorService e = Executors.newFixedThreadPool(5);
-    	for(int i =0; i < 5000; i++){
-           e.submit(new Runnable(){
-               public void run(){
-            	   long random = (long) (Math.random() * 1000);
-       			   store.insert(new Event("test", random));
-               } 
-           });
-       }
-    }
-	
 	public void removeAllTest() {
-		ConcurrentEventStore store = new ConcurrentEventStore();
+		ConcurrentEventStore store = new ConcurrentEventStore(1l);
 		String type = "typeA";
 		
 		store.insert(new Event(type, 50l));
@@ -94,59 +84,8 @@ public class ConcurrentEventStoreTest{
 		assertNull(store.getHistory().get(type));
 	}
 	
-	@Test
-	public void iteratorIllegalStateTest() {
-		
-		ConcurrentEventStore store = new ConcurrentEventStore();
-		String type = "typeA";
-		
-		store.insert(new Event(type, 50l));
-		store.insert(new Event(type, 20l));
-		store.insert(new Event(type, 80l));
-		store.insert(new Event(type, 81l));
-		store.insert(new Event(type, 10l));
 
-		EventIterator it =  store.query(type, 1l, 5l);
-		try {
-			it.current();
-		} catch (IllegalStateException e) {
-			assertNotNull(e);
-		}
-		
-		try {
-			it.remove();
-		} catch (IllegalStateException e) {
-			assertNotNull(e);
-		}
-	}
-	
-	@Test
-	public void iteratorRemoveTest() {
-		ConcurrentEventStore store = new ConcurrentEventStore();
-		String type = "typeA";
-		
-		store.insert(new Event(type, 10l));
-		store.insert(new Event(type, 20l));
-		store.insert(new Event(type, 50l));
-		store.insert(new Event(type, 80l));
-		store.insert(new Event(type, 81l));
-		
-		EventIterator it =  store.query(type, 20l, 81l);
-		
-		assertTrue(it.moveNext()); //going to 20
-		assertNotNull(it.current()); // 20
-		
-		assertTrue(it.moveNext()); //going to 50
-		it.remove(); //removing 50
-		
-		assertTrue(it.moveNext()); //80
-		assertNotNull(it.current()); 
-		
-		Collection<Event> events = store.getEvents().get(type).values();
-		for (Event event : events) {
-			assertTrue(event.timestamp() != 50l);
-		}
-	}
+
 	
 	@Test
 	public void queryInvalidArgumentsTest() {
@@ -196,6 +135,7 @@ public class ConcurrentEventStoreTest{
 		}
 		assertEquals(80l, current.timestamp());
 	}
+	
 
 	/** Tests related to the history/compression **/
 	@Test
@@ -209,14 +149,14 @@ public class ConcurrentEventStoreTest{
 	@Test
 	public void insertHistoryTest() {
 		ConcurrentEventStore store = new ConcurrentEventStore();
-		store.insertInHistory(new Event("type", 5, true), 1111111110l);
+		store.insertInHistory(new Event("type", 5), 1111111110l);
 		
 		Event event = store.getHistory().get("type").firstEntry().getValue();
 		assertNotNull(event);
 	}
 	
 	@Test
-	public void compressionTest() {
+	public void encondeAndMoveToHistoryTest() {
 		
 		ConcurrentEventStore store = new ConcurrentEventStore(20);
 		String type = "compressionTest";
@@ -239,79 +179,51 @@ public class ConcurrentEventStoreTest{
 		for (Event event : compressed) {
 			long compressedtime = i * increase;  
 			assertEquals(compressedtime, event.timestamp());
-			assertTrue(event.isCompressed());
 			i++;
 		}
 	}
 	
 	@Test
-	public void queryWithHistoryDataTest() {
+	public void removeHistoryTest() {
+		ConcurrentEventStore store = new ConcurrentEventStore(20);
+		
+		String type = "test";
+		long first = 10;
+		long increase = 1;
+		for (long i = first ; i < 20; i=i+increase) {
+			store.insert(new Event(type, i));
+		}
+		store.encodeAndMoveToHistory(type);
+		store.removeAll(type);
+		assertNull(store.getHistory().get(type));
+	}
+	
+	@Test
+	public void queryWithHistoryTest() {
 		long historyLimit = 20;
 		String type = "typeA";
 
 		ConcurrentEventStore store = new ConcurrentEventStore(historyLimit);
 		
-		long first = 10;
+		long startime = 1;
 		long increase = 1;
-		for (long i = first ; i < 30; i=i+increase) {
+		for (long i = startime ; i < 30; i++) {
 			store.insert(new Event(type, i));
 		}
-		store.encodeAndMoveToHistory(type);
 		
-		//moving some to history...
 		store.encodeAndMoveToHistory(type);
-		
-		long startTime = first;
+
 		long endTime = 28;
-		
-		EventIterator it = store.query(type, startTime, endTime);
+		EventIterator it = store.query(type, startime, endTime);
 		Event current = null;
-		int i = 0;
+		long i = startime;
 		while (it.moveNext()) {
 			current = it.current();
-			long originaltime = i + first;
-			
-			if (originaltime < historyLimit) {
-				long compressedtime = i * increase;
-				assertEquals(compressedtime, current.timestamp());
-				assertTrue(current.isCompressed());
-			}
-			
-			else {
-				assertEquals(originaltime, current.timestamp());
-				assertFalse(current.isCompressed());
-			}
+			assertEquals(i, current.timestamp());
+			assertTrue(current.timestamp() >= startime);
+			assertTrue(current.timestamp() < endTime);
 			i++;
 		}
 	}
-	
-	@Test
-	public void iteratorWitHistoryRemoveTest() {
-		ConcurrentEventStore store = new ConcurrentEventStore();
-		String type = "typeA";
-		
-		store.insert(new Event(type, 50l));
-		store.insert(new Event(type, 20l));
-		store.insert(new Event(type, 80l));
-		store.insert(new Event(type, 81l));
-		store.insert(new Event(type, 10l));
-		
-		EventIterator it =  store.query(type, 20l, 81l);
-		
-		assertTrue(it.moveNext()); //going to 20
-		assertNotNull(it.current()); // 20
-		
-		assertTrue(it.moveNext()); //going to 50
-		it.remove(); //removing 50
-		
-		assertTrue(it.moveNext()); //80
-		assertNotNull(it.current()); 
-		
-		Collection<Event> events = store.getEvents().get(type).values();
-		for (Event event : events) {
-			assertTrue(event.timestamp() != 50l);
-		}
-	}
-	
 
 }

@@ -7,22 +7,11 @@ public class Event {
     private final String type;
     private final long timestamp;
 	
-	/** indicates if the event is historical, its timestamp is compressed **/
-    private final boolean isCompressed;
-
-
     public Event(String type, long timestamp) {
         this.type = type;
         this.timestamp = timestamp;
-        this.isCompressed= false;
     }
     
-    public Event(String type, long timestamp, boolean isCompressed) {
-        this.type = type;
-        this.timestamp = timestamp;
-        this.isCompressed= isCompressed;
-    }
-
     public String type() {
         return type;
     }
@@ -31,8 +20,4 @@ public class Event {
         return timestamp;
     }
 	
-	public boolean isCompressed() {
-    	return isCompressed;
-    }
-
 }

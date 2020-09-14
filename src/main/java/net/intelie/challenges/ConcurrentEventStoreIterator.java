@@ -1,6 +1,7 @@
 package net.intelie.challenges;
 
 import java.util.Iterator;
+import java.util.Base64.Decoder;
 
 public class ConcurrentEventStoreIterator implements EventIterator {
 	
@@ -9,6 +10,7 @@ public class ConcurrentEventStoreIterator implements EventIterator {
 	
 	private Event current;
 	private boolean isHistorical;
+	private long timestamp;
 	
 	public ConcurrentEventStoreIterator(Iterator<Event> iterator) {
 		if (iterator ==  null) {
@@ -26,12 +28,13 @@ public class ConcurrentEventStoreIterator implements EventIterator {
 	 * @throws NullPointerException if both given iterators are null
 	 */
 	
-	public ConcurrentEventStoreIterator(Iterator<Event> historyIt, Iterator<Event> mainIt) {
+	public ConcurrentEventStoreIterator(Iterator<Event> historyIt, Iterator<Event> mainIt, long timestamp) {
 		if (historyIt == null && mainIt == null) {
 			throw new NullPointerException();
 		}
 		this.historyIterator = historyIt;
 		this.mainIterator = mainIt;
+		this.timestamp = timestamp;
 	}
 		
 	/**
@@ -83,6 +86,14 @@ public class ConcurrentEventStoreIterator implements EventIterator {
 		if (current == null) {
 			throw new IllegalStateException();
 		}
+		
+		if (isHistorical) {
+			//decompressing the timestamp of historical series
+			long original = DeltaEncodeDecode.decode(current.timestamp(), timestamp);
+			
+			return new Event(current.type(), original);
+		}
+		
 		return current;
 	}
 

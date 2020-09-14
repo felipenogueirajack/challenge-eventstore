@@ -59,11 +59,6 @@ import java.util.concurrent.ConcurrentSkipListMap;
  * If the focus is performance of the query result, is to better to keep the 
  * list sorted, as a binary search that runs in log n time cost can be used.
  * 
- * 
- * <p>
- * In the case of arrays, the array 
-  
-  
  * @author Felipe Nogueira
  *
  */
@@ -98,6 +93,7 @@ public class ConcurrentEventStore implements EventStore {
 		this.historyTimestampLimit = 10;
 	}
 	
+	//used for testing the history
 	public ConcurrentEventStore(long limit) {
 		this.historyTimestampLimit = limit;
 	}
@@ -134,7 +130,6 @@ public class ConcurrentEventStore implements EventStore {
 	@Override
 	public void insert(Event event) {
 		checkNotNull(event);
-
 		// If there is no skipListMap for the event type, it has to be created.
 		// The event is inserted in the corresponding skipListMap.
 		// This is done within the compute operation, which is atomically
@@ -172,11 +167,8 @@ public class ConcurrentEventStore implements EventStore {
 	 * 
 	 * It looks for the events in the main map and also in the history map. 
 	 * The timestamps in the history maps have been delta-encoded to save
-	 * memory space. Clients of this API have to decode the timestamp of historic 
-	 * events. A boolean attribute of the Event class indicates
-	 * if the timestamp is encoded or not. To decoded it, the current timestamp
-	 * must be added to the first of this historic, which can be retrieved by 
-	 * the method {@code getFirstHistoricalTimestamp}. 
+	 * memory space. As such, they are decoded before return the historic 
+	 * event.  
 	 * 
 	 * @param type      The type we are querying for.
 	 * @param startTime Start timestamp (inclusive).
@@ -209,16 +201,17 @@ public class ConcurrentEventStore implements EventStore {
 		if (startTime < historyTimestampLimit && history != null) {
 			
 			//searching in history
+			long firstTimestamp = getFirstHistoricalTimestamp(type);
 			ConcurrentNavigableMap<Long, Event> subHistory = historySubMap(type, startTime, endTime);
 			if (events == null) {
 				//all events queried for are in history
-				return new ConcurrentEventStoreIterator(subHistory.values().iterator());
+				return new ConcurrentEventStoreIterator(subHistory.values().iterator(), null, firstTimestamp);
 			}
 			
 			//events in both history and main series
 			ConcurrentNavigableMap<Long, Event> subMap = events.subMap(startTime, endTime);
 			return new ConcurrentEventStoreIterator(subHistory.values().iterator(),
-					subMap.values().iterator());
+					subMap.values().iterator(), firstTimestamp);
 		}
 		
 		//only in the main map 
@@ -246,8 +239,8 @@ public class ConcurrentEventStore implements EventStore {
 		
 		long first = getFirstHistoricalTimestamp(type);
 		
-		long compressedStart = encode(startTime, first);
-		long compressedEnd = encode(historicEndTime, first);
+		long compressedStart = DeltaEncodeDecode.encode(startTime, first);
+		long compressedEnd = DeltaEncodeDecode.encode(historicEndTime, first);
 		
 		ConcurrentSkipListMap<Long, Event> history = historyMap.get(type);
 		return history.subMap(compressedStart, compressedEnd);
@@ -278,14 +271,13 @@ public class ConcurrentEventStore implements EventStore {
 	 * (as mentioned, the first element keeps his original timestamp). We
 	 * kept the original timestamps as indexes in the historyMap. 
 	 * 
-	 * <p>It is public only for testing.
-	 * 
 	 * As an example, if the timestamps begins with 111110, 111112, 111115, the 
 	 * result compressed series would be: 111110, 2, 5. 
 	 * For simplicity, the first timestamp (111110) is stored in a secondary 
 	 * map, so all historic series can be saved using compressed timestamps 
 	 * and indexes.  
-	 * 
+	 *
+	 * For simplicity, the firstTimestamp was not updated. 
 	 *
 	 * @param type type of the events to be moved to history
 	 */
@@ -319,6 +311,15 @@ public class ConcurrentEventStore implements EventStore {
 		}
 	}
 	
+	/**
+	 * Returns the timestamp used as reference for delta-encoding of a time 
+	 * series
+	 * 
+	 * @param type of the event
+	 * @return reference timestamp used in delta encode of the history of th
+	 * events of the given type
+	 */
+	
 	public Long getFirstHistoricalTimestamp(String type) {
 		checkNotNull(type);
 		Long originaltime = historicalTimestamps.get(type);
@@ -326,27 +327,21 @@ public class ConcurrentEventStore implements EventStore {
 		return (originaltime == null) ? null : originaltime;
 	}
 	
-	public long encode(long time, long firstTimestamp) {
-		return time - firstTimestamp;
-	}
-	
-	/** Compress the timestamp of the event. It stores only the difference
-	 * between the timestamp the given event with the given {@code firstTimestamp}
-	 * Illustrates that historical series might be compressed in order to save
-	 * memory.
+	/** Creates an new event with its timestamp delta-encoded based on the
+	 * {@code firstTimestamp}
 	 * 
 	 * @param event
 	 * @param firstTimestamp
-	 * @return
+	 * @return the compresed event
 	 */
+	
 	public Event createCompressedEvent(Event event, long firstTimestamp) {
 		
 		//the timestamp attribute of the Event class is final 
 		//we need to create another event and remove the original one 
 		//from the map. if otherwise we could just move the object
-		
-		long delta = event.timestamp() - firstTimestamp;
-		Event compressedEvent = new Event(event.type(), delta, true); 
+		long delta = DeltaEncodeDecode.encode(event.timestamp(), firstTimestamp);
+		Event compressedEvent = new Event(event.type(), delta); 
 		
 		return compressedEvent;
 	}
