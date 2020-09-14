@@ -5,6 +5,9 @@ package net.intelie.challenges;
  * In Delta encoding, only the difference between two values are stored. 
  * In the following time series of 100000, 100000, 100001, 100005, the return
  * compressed would be 100000 (as the first is kept as reference), 0, 1, 5.
+ * As long values are still being used, 
+ * this is just to show the thought that we can compress historical timestamps
+ * 
  * 
  * @author Felipe Nogueira
  *
