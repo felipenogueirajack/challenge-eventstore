@@ -140,8 +140,7 @@ public class ConcurrentEventStore implements EventStore {
 		checkNotNull(event);
 		// If there is no skipListMap for the event type, it has to be created.
 		// The event is inserted in the corresponding skipListMap.
-		// This is done within the compute operation, which is atomically
-		// executed.
+		// This is done within the compute operation, which is thread safe.
 		
 		eventMap.compute(event.type(), (key, value) -> {
 			if (value == null) {
