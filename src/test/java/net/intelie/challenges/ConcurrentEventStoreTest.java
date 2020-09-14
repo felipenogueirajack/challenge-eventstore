@@ -6,16 +6,16 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
 import org.junit.Test;
 
@@ -84,8 +84,6 @@ public class ConcurrentEventStoreTest{
 		assertNull(store.getHistory().get(type));
 	}
 	
-
-
 	
 	@Test
 	public void queryInvalidArgumentsTest() {
@@ -97,7 +95,7 @@ public class ConcurrentEventStoreTest{
 		}
 		
 		try{
-			store.query("querytest", 0, 2);
+			store.query("querytest", 2, 2);
 		} catch (IllegalArgumentException e) {
 			assertNotNull(e);
 		}
@@ -206,7 +204,6 @@ public class ConcurrentEventStoreTest{
 		ConcurrentEventStore store = new ConcurrentEventStore(historyLimit);
 		
 		long startime = 1;
-		long increase = 1;
 		for (long i = startime ; i < 30; i++) {
 			store.insert(new Event(type, i));
 		}
@@ -225,5 +222,27 @@ public class ConcurrentEventStoreTest{
 			i++;
 		}
 	}
+
+	@Test
+	public void minorConcurrencyTest() throws InterruptedException {
+		ConcurrentEventStore store = new ConcurrentEventStore();
+		ExecutorService executor = Executors.newFixedThreadPool(4);
+		
+		int max = 50000;
+		
+		executor.execute(() -> {
+			for(long i = 1; i < max; i++) {
+				store.insert(new Event("1", i));
+				store.insert(new Event("1", i*10));
+				EventIterator it = store.query("1", 1, i+1);
+				assertTrue(it.moveNext());
+			}
+		});
+		
+        executor.shutdown();
+        executor.awaitTermination(60, TimeUnit.SECONDS);
+        assertEquals(max-1, store.getEvents().get("1").size());
+    }
+	
 
 }

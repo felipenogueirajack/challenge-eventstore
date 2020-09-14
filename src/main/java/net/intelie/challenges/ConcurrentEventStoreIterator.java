@@ -74,7 +74,11 @@ public class ConcurrentEventStoreIterator implements EventIterator {
 	}
 
 	/**
-	 * Returns the current event of the iteration
+	 * Returns the current event of the iteration. 
+	 * If the event is historical, its timestamp is compressed, so 
+	 * it decompresses, creating a new event with its original noncompressed
+	 * timestamp. In that way, only when this method is called, the decompression
+	 * takes place.   
 	 * 
 	 * @return the current event
 	 * @throws IllegalStateException if {@link #moveNext} was never called
@@ -89,7 +93,7 @@ public class ConcurrentEventStoreIterator implements EventIterator {
 		
 		if (isHistorical) {
 			//decompressing the timestamp of historical series
-			long original = DeltaEncodeDecode.decode(current.timestamp(), timestamp);
+			long original = DeltaEncoderDecoder.decode(current.timestamp(), timestamp);
 			
 			return new Event(current.type(), original);
 		}
