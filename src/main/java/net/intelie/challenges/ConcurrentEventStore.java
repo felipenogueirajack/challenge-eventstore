@@ -54,9 +54,9 @@ import java.util.concurrent.ConcurrentSkipListMap;
  * than one element only when there is a timestamp repetition. 
  * In fact, if there is a lot of event data, indexing by their timestamp alone 
  * will affect performance. It is possible to have group of events 
- * indexed by a function of the timestamp, for instance those that happened in 
+ * whose key is a function of the timestamp, for instance those that happened in 
  * the same minute. A point of attention is that, in this case, the 
- * indexed list would consist of different timestamps and the query method
+ * event list would consist of different timestamps and the query method
  * requires the events to be searched. As such, if the list is kept unsorted, 
  * will favor insertion and remove, which will perform in constant time, but 
  * it will terrible downgrade the query, as the lists whose events are 
